@@ -1,9 +1,8 @@
 <?php
 
-appLog("Start of include");
+appLog("Start of download tracker include", "DEBUG");
 
-
-//$app = new TrackDownloads(true);
+//$app = new TrackDownloads(true); // Use this line when creating a new database
 $app = new TrackDownloads();
 
 $app->run();
@@ -11,6 +10,12 @@ $app->conn->close();
 
 /**
  * Class TrackDownloads
+ *
+ * Save to /tracker/download.php
+ *
+ * Ensure 777 for log file if stored outside of home directory
+ *
+ * Test with https://site.com/tracker/download.php?file=xyz.pdf
  *
  * https://stackoverflow.com/questions/8155652/best-way-to-track-direct-file-downloads
  * https://www.w3schools.com/pHP/php_mysql_create.asp
@@ -25,7 +30,9 @@ $app->conn->close();
  *
  * NGINX
  *
- *
+ * location /downloads/ {
+ *    rewrite /downloads/(.*).(rar|zip|pdf)$ /tracker/download.php?file=$1.$2;
+ * }
  *
  */
 class TrackDownloads
@@ -51,31 +58,48 @@ class TrackDownloads
     function run()
     {
         appLog("Now running");
-        $baseDir = "/home/eugene/code/track-downloads";
-//        $path    = realpath($baseDir . "/" . basename($_GET['file']));
+
+        $baseDir = "/home/xpatwebcom/public_html/downloads";
+
+        $path    = realpath($baseDir . "/" . basename($_GET['file']));
+
+        appLog("The baseDir is $baseDir and the full path is $path");
 
         $filename = basename($_GET['file']);
-//        $filename = "brochure.pdf";
+
+        appLog("The filename is $filename");
 
         $path = realpath($baseDir . "/$filename");
 
+        appLog("The path is $path");
+
 //        if (dirname($path) == $baseDir) {
 //            if (!$this->isBot())
+
+        $ip = $_SERVER['REMOTE_ADDR'];
+
+        appLog("The IP is: $ip");
+
         $this->sql("
                   INSERT INTO downloads
-                    SET filename='" . mysqli_real_escape_string($this->conn, $filename) . "' ON DUPLICATE KEY UPDATE stats = stats + 1");
+                    SET ip_address='$ip', filename='" . mysqli_real_escape_string($this->conn, $filename) . "'");
+
 
         header("Cache-Control: public");
         header("Content-Description: File Transfer");
-        header("Content-Disposition: attachment; filename=" . basename($_GET['file']));
+        // Use inline instead of attachment to display PDFs inline
+        header("Content-Disposition: inline; filename=" . basename($_GET['file']));
         header("Content-Length: " . filesize($path));
-        header("Content-Type: application/force-download");
+//        header("Content-Type: application/force-download");
+        header("Content-Type: application/pdf");
         header("Content-Transfer-Encoding: binary");
+
+        appLog("The database insert is done, now sending the file to the browser...");
 
         ob_clean();
         ob_end_flush();
 
-//        readfile($path);
+        readfile($path);
 
 //        }
     }
@@ -92,8 +116,8 @@ class TrackDownloads
 
     function credentials()
     {
-        $host     = "localhost";
-        $username = "root";
+        $host     = "1.2.3.4";
+        $username = "username";
         $password = "password";
         $db       = "track_downloads";
         return [$host, $username, $password, $db];
@@ -101,11 +125,13 @@ class TrackDownloads
 
     function sql($sql)
     {
+        appLog ("In SQL Function");
         if ($this->conn->query($sql) === TRUE) {
-            echo "SQL: $sql: OK\n";
+            appLog("SQL: $sql: OK");
         } else {
-            echo "Error with SQL query: " . $this->conn->error;
+            appLog("Error with SQL query: " . $this->conn->error);
         }
+        // Should we $conn->close(); here?
     }
 
     function execute($sql)
@@ -115,13 +141,14 @@ class TrackDownloads
 
         $conn = new mysqli($host, $username, $password);
         if ($conn->connect_error) {
+            appLog("Connection failed: " . $conn->connect_error);
             die("Connection failed: " . $conn->connect_error);
         }
 
         if ($conn->query($sql) === TRUE) {
-            echo "Execute: $sql: OK\n";
+            appLog("Execute: $sql: OK");
         } else {
-            echo "Error executing SQL: " . $conn->error;
+            appLog("Error executing SQL: " . $conn->error);
         }
 
         $conn->close();
@@ -171,4 +198,3 @@ function appLog($message, $severity = 'INFO')
         FILE_APPEND
     );
 }
-
