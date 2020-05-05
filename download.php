@@ -34,6 +34,8 @@ $app->conn->close();
  *    rewrite /downloads/(.*).(rar|zip|pdf)$ /tracker/download.php?file=$1.$2;
  * }
  *
+ * The /downloads must match $baseDir in the code
+ *
  */
 class TrackDownloads
 {
@@ -59,7 +61,7 @@ class TrackDownloads
     {
         appLog("Now running");
 
-        $baseDir = "/home/xpatwebcom/public_html/downloads";
+        $baseDir = "/home/sitename/public_html/downloads";
 
         $path    = realpath($baseDir . "/" . basename($_GET['file']));
 
@@ -180,11 +182,11 @@ class TrackDownloads
         $this->conn = $this->dbConnection();
         $this->sql("
               CREATE TABLE `downloads` (
+                `id` int(10) auto_increment not null primary key,
                 `filename` varchar(255),
-                `ip_address` varchar(255),
-                  `stats` int(11),
-                   `created_at` datetime default current_timestamp,
-              PRIMARY KEY  (`filename`))");
+                `ip_address` varchar(255),                  
+                `created_at` datetime default current_timestamp,
+              )");
     }
 
 }
